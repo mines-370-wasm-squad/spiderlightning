@@ -173,6 +173,18 @@ impl Display for SqlResource {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub enum StupidResource {
+    #[serde(rename = "stupid.dumb")]
+    Dumb,
+}
+
+impl Display for StupidResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "stupid.dumb")
+    }
+}
+
 /// All the resources that slightfile supports. This is used in the
 /// `Capability` section in slightfile to specify what resource a
 /// capability is for.
@@ -187,6 +199,7 @@ pub enum Resource {
     Configs(ConfigsResource),
     DistributedLocking(DistributedLockingResource),
     Sql(SqlResource),
+    Stupid(StupidResource),
 }
 
 impl Default for Resource {
@@ -206,6 +219,7 @@ impl Resource {
             Resource::Configs(_) => "configs".into(),
             Resource::DistributedLocking(_) => "distributed_locking".into(),
             Resource::Sql(_) => "sql".into(),
+            Resource::Stupid(_) => "stupid".into(),
         }
     }
 }
@@ -223,6 +237,7 @@ impl Display for Resource {
                 write!(f, "{distributed_locking}")
             }
             Resource::Sql(sql_postgres) => write!(f, "{sql_postgres}"),
+            Resource::Stupid(stupid) => write!(f, "{stupid}"),
         }
     }
 }

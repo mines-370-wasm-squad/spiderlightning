@@ -1,0 +1,3 @@
+resource stupid {
+  static open-browser: func(url: string) -> expected<unit, string>
+}

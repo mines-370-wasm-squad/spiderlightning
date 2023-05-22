@@ -29,6 +29,7 @@ use slight_runtime::{Builder, Ctx};
 use slight_runtime_configs::Configs;
 #[cfg(feature = "sql")]
 use slight_sql::Sql;
+use slight_stupid::Stupid;
 use wit_bindgen_wasmtime::wasmtime::Store;
 
 pub type IORedirects = slight_runtime::IORedirects;
@@ -213,6 +214,12 @@ fn link_all_caps(builder: &mut Builder, linked_capabilities: &mut HashSet<String
         .add_to_builder("http-client".to_string(), http_client);
     linked_capabilities.insert("http-client".to_string());
 
+    let stupid = Stupid;
+    builder
+        .link_capability::<Stupid>()?
+        .add_to_builder("stupid".to_string(), stupid);
+    linked_capabilities.insert("stupid".to_string());
+
     Ok(())
 }
 
@@ -328,6 +335,15 @@ async fn build_store_instance(
                         .link_capability::<HttpClient>()?
                         .add_to_builder("http-client".to_string(), http_client);
                     linked_capabilities.insert("http-client".to_string());
+                }
+            }
+            Resource::Stupid(_) => {
+                if !linked_capabilities.contains("stupid") {
+                    let stupid = Stupid;
+                    builder
+                        .link_capability::<Stupid>()?
+                        .add_to_builder("stupid".to_string(), stupid);
+                    linked_capabilities.insert("stupid".to_string());
                 }
             }
         }
