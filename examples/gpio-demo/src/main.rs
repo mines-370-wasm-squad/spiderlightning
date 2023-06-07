@@ -1,7 +1,7 @@
 use std::thread;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use gpio::*;
 use keyvalue::*;
@@ -24,21 +24,38 @@ fn main() -> Result<()> {
     let output_pin = OutputPin::get_named("led")?;
 
     let kv_store = Keyvalue::open("gpio-demo-control")?;
-    kv_store.set("status", "ready".as_bytes())?;
+    kv_store.set("status", "disabled".as_bytes())?;
 
-    while kv_store.get("status")? != "enqueued".as_bytes() {
+    fn run_disabled() {
         thread::sleep(Duration::from_millis(250));
     }
 
-    kv_store.set("status", "running".as_bytes())?;
-
-    while kv_store.get("status")? != "dequeued".as_bytes() {
+    let run_enabled = || {
         output_pin.write(LogicLevel::High);
         sleep(input_pin.read());
         output_pin.write(LogicLevel::Low);
         sleep(input_pin.read());
-    }
+    };
 
-    kv_store.set("status", "stopped".as_bytes())?;
-    Ok(())
+    loop {
+        match String::from_utf8(kv_store.get("status")?)?.as_str() {
+            "disabling" => {
+                kv_store.set("status", "disabled".as_bytes())?;
+                run_disabled();
+            }
+            "disabled" => run_disabled(),
+            "enabling" => {
+                kv_store.set("status", "enabled".as_bytes())?;
+                run_enabled();
+            }
+            "enabled" => run_enabled(),
+            "stopping" => {
+                kv_store.set("status", "stopped".as_bytes())?;
+                return Ok(());
+            }
+            unknown => {
+                return Err(anyhow!("unknown state {unknown}"));
+            }
+        }
+    }
 }
