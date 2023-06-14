@@ -3,11 +3,15 @@ use std::sync::Arc;
 use crate::implementors::*;
 use crate::{gpio, Pull};
 
+/// A no-op GPIO implementation used for testing.
+///
+/// It stores the last [MockPin] it constructed to compare against what is expected for a given configuration.
 #[derive(Default)]
 struct MockGpioImplementor {
+    /// The last [MockPin] constructed, if any.
     last_construction: Option<MockPin>,
 }
-
+///defines functions for new test gpioImplementor to be used in testing. Creates input/output pins
 impl GpioImplementor for MockGpioImplementor {
     fn new_input_pin(
         &mut self,
@@ -28,8 +32,24 @@ impl GpioImplementor for MockGpioImplementor {
         self.last_construction.replace(pin);
         Ok(Arc::new(pin))
     }
+
+    fn new_pwm_output_pin(
+        &mut self,
+        pin: u8,
+        period_microseconds: Option<u32>,
+    ) -> Result<Arc<dyn PwmOutputPinImplementor>, gpio::GpioError> {
+        let pin = MockPin::PwmOutput {
+            pin,
+            period_microseconds,
+        };
+        self.last_construction.replace(pin);
+        Ok(Arc::new(pin))
+    }
 }
 
+/// A no-op implementation of every pin type, used for testing.
+///
+/// It stores its type and the parameters it was constructed with to compare against what is expected for a given configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MockPin {
     Input {
@@ -40,18 +60,30 @@ enum MockPin {
         pin: u8,
         init_level: Option<gpio::LogicLevel>,
     },
+    PwmOutput {
+        pin: u8,
+        period_microseconds: Option<u32>,
+    },
 }
 
+/// Defines read for inputPins
 impl InputPinImplementor for MockPin {
     fn read(&self) -> gpio::LogicLevel {
         gpio::LogicLevel::Low
     }
 }
-
+/// Defines write for outputPins
 impl OutputPinImplementor for MockPin {
     fn write(&self, _: gpio::LogicLevel) {}
 }
 
+impl PwmOutputPinImplementor for MockPin {
+    fn set_duty_cycle(&self, _: f32) {}
+    fn enable(&self) {}
+    fn disable(&self) {}
+}
+
+/// First test checks that the format pinNum/type\[/subType\] is followed
 #[test]
 fn good_pin_configs() {
     let mut gpio = MockGpioImplementor::default();
@@ -92,7 +124,22 @@ fn good_pin_configs() {
                 init_level: Some(gpio::LogicLevel::High),
             },
         ),
+        (
+            "7/pwm_output",
+            MockPin::PwmOutput {
+                pin: 7,
+                period_microseconds: None,
+            },
+        ),
+        (
+            "8/pwm_output/250",
+            MockPin::PwmOutput {
+                pin: 8,
+                period_microseconds: Some(250),
+            },
+        ),
     ] {
+        // parse through pin configs and checks if it is valid. This goes through the slight file config.
         let result = (&mut gpio as &mut dyn GpioImplementor).parse_pin_config(config);
         assert!(result.is_ok(), "good config '{config}' returned {result:?}");
         match gpio.last_construction {
@@ -105,6 +152,7 @@ fn good_pin_configs() {
     }
 }
 
+/// Tests for bad pin inputs that do not follow pinNum/type\[/subType\]
 #[test]
 fn bad_pin_configs() {
     let mut gpio = MockGpioImplementor::default();
@@ -121,6 +169,14 @@ fn bad_pin_configs() {
         "1/output/low/me",
         "-1/input",
         "420/output",
+        "3.1415/input",
+        "///",
+        "2.71828/Eureka!",
+        "1/2/3",
+        "input/input/input",
+        "1/pwm_output/high",
+        "1/pwm_output/-4",
+        "1/pwm_output/99999999999999999999999999999",
     ] {
         match gpio.parse_pin_config(config) {
             Err(gpio::GpioError::ConfigurationError(_)) => (),
