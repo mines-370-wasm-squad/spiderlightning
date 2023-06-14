@@ -40,6 +40,7 @@ fn main() -> Result<()> {
                 thread::sleep(Duration::from_millis(200));
             }
             "enabled" => {
+                pwm_output_pin.enable();
                 blink_current = match blink_current {
                     LogicLevel::Low => LogicLevel::High,
                     LogicLevel::High => LogicLevel::Low,
@@ -63,6 +64,8 @@ fn main() -> Result<()> {
                 }
             }
             "stopped" => {
+                output_pin.write(LogicLevel::Low);
+                pwm_output_pin.disable();
                 return Ok(());
             }
             unknown => {
